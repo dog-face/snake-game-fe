@@ -45,7 +45,8 @@ npm install
 
 2. Configure the API URL (optional):
    - Create a `.env` file in the root directory
-   - Add: `REACT_APP_API_URL=http://localhost:8000/api/v1`
+   - Add: `VITE_API_URL=http://localhost:8000/api/v1`
+   - Or use: `REACT_APP_API_URL=http://localhost:8000/api/v1` (also supported)
    - Defaults to `http://localhost:8000/api/v1` if not set
 
 3. Start the backend server (in a separate terminal):
