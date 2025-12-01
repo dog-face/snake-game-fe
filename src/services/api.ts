@@ -1,10 +1,14 @@
 // Centralized API service - all backend calls go through here
-// Everything is mocked for now
+// Connected to real backend API
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
 export interface User {
   id: string;
   username: string;
   email: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface LoginCredentials {
@@ -24,14 +28,18 @@ export interface LeaderboardEntry {
   score: number;
   gameMode: 'pass-through' | 'walls';
   date: string;
+  createdAt?: string;
 }
 
 export interface ActivePlayer {
   id: string;
+  userId?: string;
   username: string;
   score: number;
   gameMode: 'pass-through' | 'walls';
   gameState: GameState;
+  startedAt?: string;
+  lastUpdatedAt?: string;
 }
 
 export interface GameState {
@@ -42,134 +50,201 @@ export interface GameState {
   gameOver: boolean;
 }
 
-// Mock storage for users (simulating a database)
-const mockUsers: Array<User & { password: string }> = [
-  { id: '1', username: 'player1', email: 'player1@example.com', password: 'password1' },
-  { id: '2', username: 'player2', email: 'player2@example.com', password: 'password2' },
-];
-
-// Mock leaderboard data
-const mockLeaderboard: LeaderboardEntry[] = [
-  { id: '1', username: 'player1', score: 150, gameMode: 'pass-through', date: '2024-01-15' },
-  { id: '2', username: 'player2', score: 120, gameMode: 'walls', date: '2024-01-14' },
-  { id: '3', username: 'champion', score: 200, gameMode: 'pass-through', date: '2024-01-13' },
-  { id: '4', username: 'player1', score: 100, gameMode: 'walls', date: '2024-01-12' },
-  { id: '5', username: 'gamer', score: 90, gameMode: 'pass-through', date: '2024-01-11' },
-];
-
 class ApiService {
-  private currentUser: User | null = null;
+  private token: string | null = null;
+
+  // Store token after login/signup
+  private setToken(token: string): void {
+    this.token = token;
+    localStorage.setItem('token', token);
+  }
+
+  // Get token from storage
+  private getToken(): string | null {
+    if (!this.token) {
+      this.token = localStorage.getItem('token');
+    }
+    return this.token;
+  }
+
+  // Clear token on logout
+  private clearToken(): void {
+    this.token = null;
+    localStorage.removeItem('token');
+  }
+
+  // Helper to get auth headers
+  private getAuthHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    const token = this.getToken();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+  }
+
+  // Helper to handle errors
+  private async handleError(response: Response): Promise<never> {
+    const error = await response.json();
+    const message = error.detail?.error?.message || error.detail || 'Request failed';
+    throw new Error(message);
+  }
 
   // Authentication
   async login(credentials: LoginCredentials): Promise<User> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const user = mockUsers.find(
-      u => u.username === credentials.username && u.password === credentials.password
-    );
-    
-    if (!user) {
-      throw new Error('Invalid username or password');
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
     }
-    
-    const { password, ...userWithoutPassword } = user;
-    this.currentUser = userWithoutPassword;
-    return userWithoutPassword;
+
+    const data = await response.json();
+    this.setToken(data.token);
+    return data.user;
   }
 
   async signup(data: SignupData): Promise<User> {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    if (mockUsers.some(u => u.username === data.username)) {
-      throw new Error('Username already exists');
+    const response = await fetch(`${API_BASE_URL}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
     }
-    
-    if (mockUsers.some(u => u.email === data.email)) {
-      throw new Error('Email already exists');
-    }
-    
-    const newUser: User & { password: string } = {
-      id: String(mockUsers.length + 1),
-      username: data.username,
-      email: data.email,
-      password: data.password,
-    };
-    
-    mockUsers.push(newUser);
-    const { password, ...userWithoutPassword } = newUser;
-    this.currentUser = userWithoutPassword;
-    return userWithoutPassword;
+
+    const result = await response.json();
+    this.setToken(result.token);
+    return result.user;
   }
 
   async logout(): Promise<void> {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    this.currentUser = null;
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    if (response.ok) {
+      this.clearToken();
+    }
   }
 
-  getCurrentUser(): User | null {
-    return this.currentUser;
+  async getCurrentUser(): Promise<User | null> {
+    const token = this.getToken();
+    if (!token) return null;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: this.getAuthHeaders(),
+      });
+
+      if (!response.ok) {
+        this.clearToken();
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      this.clearToken();
+      return null;
+    }
   }
 
   // Leaderboard
-  async getLeaderboard(limit: number = 10): Promise<LeaderboardEntry[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return [...mockLeaderboard].sort((a, b) => b.score - a.score).slice(0, limit);
+  async getLeaderboard(limit: number = 10, gameMode?: 'pass-through' | 'walls'): Promise<LeaderboardEntry[]> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+    });
+    if (gameMode) {
+      params.append('gameMode', gameMode);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/leaderboard?${params}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch leaderboard');
+    }
+
+    const data = await response.json();
+    return data.entries;
   }
 
   async submitScore(score: number, gameMode: 'pass-through' | 'walls'): Promise<LeaderboardEntry> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    if (!this.currentUser) {
-      throw new Error('Must be logged in to submit score');
+    const response = await fetch(`${API_BASE_URL}/leaderboard`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ score, game_mode: gameMode }),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
     }
-    
-    const entry: LeaderboardEntry = {
-      id: String(mockLeaderboard.length + 1),
-      username: this.currentUser.username,
-      score,
-      gameMode,
-      date: new Date().toISOString().split('T')[0],
-    };
-    
-    mockLeaderboard.push(entry);
-    return entry;
+
+    return await response.json();
   }
 
   // Active players (for watching)
   async getActivePlayers(): Promise<ActivePlayer[]> {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Return mock active players - these will be updated by the watch component
-    return [
-      {
-        id: 'active1',
-        username: 'player1',
-        score: 45,
-        gameMode: 'pass-through',
-        gameState: {
-          snake: [{ x: 5, y: 5 }, { x: 4, y: 5 }, { x: 3, y: 5 }],
-          food: { x: 10, y: 10 },
-          direction: 'right',
-          score: 45,
-          gameOver: false,
-        },
-      },
-      {
-        id: 'active2',
-        username: 'player2',
-        score: 30,
-        gameMode: 'walls',
-        gameState: {
-          snake: [{ x: 15, y: 15 }, { x: 14, y: 15 }, { x: 13, y: 15 }],
-          food: { x: 20, y: 20 },
-          direction: 'down',
-          score: 30,
-          gameOver: false,
-        },
-      },
-    ];
+    const response = await fetch(`${API_BASE_URL}/watch/active`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch active players');
+    }
+
+    const data = await response.json();
+    return data.players;
+  }
+
+  // Game session management (for watch feature)
+  async startGameSession(gameMode: 'pass-through' | 'walls'): Promise<{ sessionId: string }> {
+    const response = await fetch(`${API_BASE_URL}/watch/start`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ gameMode }),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
+    }
+
+    const data = await response.json();
+    return { sessionId: data.sessionId };
+  }
+
+  async updateGameState(sessionId: string, gameState: GameState): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/watch/update/${sessionId}`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ gameState }),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
+    }
+  }
+
+  async endGameSession(
+    sessionId: string,
+    finalScore: number,
+    gameMode: 'pass-through' | 'walls'
+  ): Promise<LeaderboardEntry> {
+    const response = await fetch(`${API_BASE_URL}/watch/end/${sessionId}`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ finalScore, gameMode }),
+    });
+
+    if (!response.ok) {
+      await this.handleError(response);
+    }
+
+    const data = await response.json();
+    return data.leaderboardEntry;
   }
 }
 

@@ -9,12 +9,13 @@ export const Leaderboard: React.FC = () => {
 
   useEffect(() => {
     loadLeaderboard();
-  }, []);
+  }, [filter]);
 
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getLeaderboard(20);
+      const gameMode = filter === 'all' ? undefined : filter;
+      const data = await apiService.getLeaderboard(20, gameMode);
       setLeaderboard(data);
     } catch (error) {
       console.error('Failed to load leaderboard:', error);
@@ -23,9 +24,7 @@ export const Leaderboard: React.FC = () => {
     }
   };
 
-  const filteredLeaderboard = filter === 'all'
-    ? leaderboard
-    : leaderboard.filter(entry => entry.gameMode === filter);
+  const filteredLeaderboard = leaderboard;
 
   const getRank = (index: number) => {
     if (index === 0) return '🥇';

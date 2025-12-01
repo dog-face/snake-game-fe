@@ -34,6 +34,7 @@ A modern, interactive Snake game frontend built with React, TypeScript, and Vite
 ### Prerequisites
 
 - Node.js 18+ and npm
+- Backend server running (see [snake-game-be](https://github.com/dog-face/snake-game-be))
 
 ### Installation
 
@@ -42,12 +43,24 @@ A modern, interactive Snake game frontend built with React, TypeScript, and Vite
 npm install
 ```
 
-2. Start the development server:
+2. Configure the API URL (optional):
+   - Create a `.env` file in the root directory
+   - Add: `REACT_APP_API_URL=http://localhost:8000/api/v1`
+   - Defaults to `http://localhost:8000/api/v1` if not set
+
+3. Start the backend server (in a separate terminal):
+```bash
+# Follow instructions in the backend repository
+cd ../snake-game-be
+# Start the backend server
+```
+
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-3. Open your browser to `http://localhost:5173`
+5. Open your browser to `http://localhost:5173`
 
 ### Testing
 
@@ -101,18 +114,19 @@ src/
     └── setup.ts        # Vitest configuration
 ```
 
-## Mock Credentials
-
-For testing, you can use these pre-configured accounts:
-
-- Username: `player1`, Password: `password1`
-- Username: `player2`, Password: `password2`
-
-Or create a new account via the Signup page.
-
 ## API Service
 
-All backend calls are centralized in `src/services/api.ts`. Currently, everything is mocked, but when you're ready to connect to a real backend, you only need to update this single file.
+All backend calls are centralized in `src/services/api.ts` and connected to the real backend API. The service handles:
+- JWT token management (stored in localStorage)
+- Authentication (login, signup, logout)
+- Leaderboard operations
+- Active player tracking for watch feature
+
+### Backend Integration
+
+The frontend is integrated with the backend API. Make sure the backend server is running at `http://localhost:8000` (or update the `REACT_APP_API_URL` environment variable).
+
+See the [Backend Repository](https://github.com/dog-face/snake-game-be) for backend setup instructions.
 
 ## Game Controls
 

@@ -6,7 +6,7 @@ This document specifies the backend API requirements for the Snake Game frontend
 
 ## Base URL
 
-All API endpoints should be prefixed with a base URL (e.g., `https://api.snakegame.com/api/v1` or `http://localhost:3000/api/v1`).
+All API endpoints should be prefixed with a base URL (e.g., `https://api.snakegame.com/api/v1` or `http://localhost:8000/api/v1`).
 
 ## Authentication
 
@@ -565,7 +565,7 @@ The frontend currently uses a mock API service located at:
 
 **Example API service update:**
 ```typescript
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api/v1';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/v1';
 
 async login(credentials: LoginCredentials): Promise<User> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {

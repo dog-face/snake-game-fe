@@ -16,10 +16,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in (in a real app, this would check localStorage/token)
-    const currentUser = apiService.getCurrentUser();
-    setUser(currentUser);
-    setLoading(false);
+    // Check if user is already logged in by calling the API
+    const checkAuth = async () => {
+      try {
+        const currentUser = await apiService.getCurrentUser();
+        setUser(currentUser);
+      } catch (error) {
+        // Token is invalid or expired
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkAuth();
   }, []);
 
   const login = async (username: string, password: string) => {
